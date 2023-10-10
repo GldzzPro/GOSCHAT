@@ -11,7 +11,6 @@ import {
   CardHeader,
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
-
 function App() {
   const [input, setInput] = React.useState("");
   const inputLength = input.trim().length;
@@ -52,7 +51,7 @@ function App() {
   React.useEffect(() => {
     const sse = new EventSource(eventSourceString, { withCredentials: true });
     function getRealtimeData(data: MessageData) {
-      setMessages([...messages, data]);
+      setMessages((prev) => [...prev, data]);
     }
     sse.onmessage = (e) => getRealtimeData(JSON.parse(e.data));
     sse.onerror = () => {
