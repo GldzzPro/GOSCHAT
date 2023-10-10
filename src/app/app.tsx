@@ -11,6 +11,7 @@ import {
   CardHeader,
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
+
 function App() {
   const [input, setInput] = React.useState("");
   const inputLength = input.trim().length;
@@ -20,51 +21,71 @@ function App() {
     channel: string;
     data: string;
     name: string;
+    mine?: boolean;
   };
-  const [messages, setMessages] = React.useState<MessageData[]>([
-    {
-      id: "iHpUuGFLvy:0:0",
-      timestamp: 1696771088426,
-      channel: "channel1",
-      data: "Hey, I'm having trouble with my account.",
-      name: "tzusamen",
-    },
-    {
-      id: "etmuxiS_Zt:0:0",
-      timestamp: 1696770820546,
-      channel: "channel1",
-      data: "meinshaft",
-      name: "tzusamen",
-    },
-    {
-      id: "IpFSBgbY2C:0:0",
-      timestamp: 1696770783345,
-      channel: "channel1",
-      data: "bvb",
-      name: "deutcher meister",
-    },
-  ]);
+  const [messages, setMessages] = React.useState<MessageData[]>([]);
+  const running = React.useRef(true);
+  const pending = React.useRef(new Set<string>());
+  const waiting = React.useRef<Promise<void>>();
+  const [currentTry, nextTry] = React.useReducer((s) => s + 1, 0);
 
-  const chatroomTitle = "#GAME OF SECRET CHATROOM";
+  const chatroomTitle = "#GAME OF SECRETS CHATROOM";
   const eventSourceString =
     "https://realtime.ably.io/sse?v=1.2&channels=channel1&key=qRXQpA.YkOXtw:fTxs7siJ5I131E1krpPdpZiDf0Vx2Hrx3xx_D1cqyxk";
   React.useEffect(() => {
+    running.current = true;
     const sse = new EventSource(eventSourceString, { withCredentials: true });
-    function getRealtimeData(data: MessageData) {
-      setMessages((prev) => [...prev, data]);
+    async function getRealtimeData(data: MessageData) {
+      await waiting.current;
+      setMessages((prev) => {
+        const id = data.id.slice(0, -2);
+
+        if (pending.current.has(id)) {
+          pending.current.delete(id);
+          data.mine = true;
+        }
+        return [...prev, data];
+      });
     }
     sse.onmessage = (e) => getRealtimeData(JSON.parse(e.data));
     sse.onerror = () => {
-      alert("EventSource failed.");
+      const isRunning = running.current;
       sse.close();
+      if (!isRunning) return;
+      nextTry();
     };
     return () => {
+      running.current = false;
       sse.close();
     };
-  }, []);
+  }, [currentTry]);
+  const send = async () => {
+    if (inputLength === 0) return;
+    setInput("");
+    waiting.current = Promise.resolve(waiting.current)
+      .then(async () => {
+        const res = await fetch(
+          "https://rest.ably.io/channels/channel1/messages",
+          {
+            method: "POST",
+            body: JSON.stringify({ name: "msg", data: input }),
+            headers: {
+              "Content-Type": "application/json",
+              Authorization:
+                "Basic cVJYUXBBLllrT1h0dzpmVHhzN3NpSjVJMTMxRTFrcnBQZHBaaURmMFZ4MkhyeDN4eF9EMWNxeXhr",
+            },
+          }
+        );
+        const msg: { messageId: string } = await res.json();
+        pending.current.add(msg.messageId);
+      })
+      .catch(() => {
+        alert("Network Error");
+      });
+  };
   return (
     <main>
-      <Card>
+      <Card className="h-screen flex flex-col">
         <CardHeader className="flex flex-row items-center">
           <div className="flex items-center space-x-4">
             <div>
@@ -74,20 +95,19 @@ function App() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="grow overflow-y-auto">
           <div className="space-y-4">
-            {messages.map((message, index) => (
+            {messages.map((message) => (
               <div
-                key={index}
+                key={message.id}
                 className={cn(
                   "flex w-max max-w-[75%] flex-col gap-2 rounded-lg px-3 py-2 text-sm",
                   "bg-muted",
-                  // message.role === "user"
-                  //   ? "ml-auto bg-primary text-primary-foreground"
-                  //   : "bg-muted"
+                  message.mine
+                    ? "ml-auto bg-primary text-primary-foreground"
+                    : "bg-muted"
                 )}
               >
-                <div className={cn()}>{message.name}</div>
                 {message.data}
               </div>
             ))}
@@ -97,18 +117,7 @@ function App() {
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              if (inputLength === 0) return;
-              setMessages([
-                ...messages,
-                {
-                  id: "iHpUuGFLvy:0:0",
-                  timestamp: 1696771088426,
-                  channel: "channel1",
-                  data: input,
-                  name: "meizer",
-                },
-              ]);
-              setInput("");
+              send();
             }}
             className="flex w-full items-center space-x-2"
           >
