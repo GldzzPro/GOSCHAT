@@ -34,16 +34,13 @@ function App() {
   const eventSourceString =
     "https://realtime.ably.io/sse?v=1.2&channels=channel1&key=qRXQpA.YkOXtw:fTxs7siJ5I131E1krpPdpZiDf0Vx2Hrx3xx_D1cqyxk";
   React.useEffect(() => {
-    console.log(scrollRef.current?.lastElementChild)
     scrollRef.current?.lastElementChild?.scrollIntoView();
   }, [messages]);
   React.useEffect(() => {
     running.current = true;
     const sse = new EventSource(eventSourceString, { withCredentials: true });
     async function getRealtimeData(data: MessageData) {
-      console.log({ data });
       await waiting.current;
-      console.log({ done: 1 });
       setMessages((prev) => {
         const id = data.id.slice(0, -2);
 
@@ -56,7 +53,6 @@ function App() {
     }
     sse.onmessage = (e) => getRealtimeData(JSON.parse(e.data));
     sse.onerror = () => {
-      console.log("errrrrrrrrrrrr");
       const isRunning = running.current;
       sse.close();
       if (!isRunning) return;
@@ -91,7 +87,6 @@ function App() {
         alert("Network Error");
       });
   };
-  console.log(messages);
   return (
     <main>
       <Card className="h-screen flex flex-col">
