@@ -27,16 +27,23 @@ function App() {
   const running = React.useRef(true);
   const pending = React.useRef(new Set<string>());
   const waiting = React.useRef<Promise<void>>();
+  const scrollRef = React.useRef<HTMLDivElement>(null);
   const [currentTry, nextTry] = React.useReducer((s) => s + 1, 0);
 
   const chatroomTitle = "#GAME OF SECRETS CHATROOM";
   const eventSourceString =
     "https://realtime.ably.io/sse?v=1.2&channels=channel1&key=qRXQpA.YkOXtw:fTxs7siJ5I131E1krpPdpZiDf0Vx2Hrx3xx_D1cqyxk";
   React.useEffect(() => {
+    console.log(scrollRef.current?.lastElementChild)
+    scrollRef.current?.lastElementChild?.scrollIntoView();
+  }, [messages]);
+  React.useEffect(() => {
     running.current = true;
     const sse = new EventSource(eventSourceString, { withCredentials: true });
     async function getRealtimeData(data: MessageData) {
+      console.log({ data });
       await waiting.current;
+      console.log({ done: 1 });
       setMessages((prev) => {
         const id = data.id.slice(0, -2);
 
@@ -49,6 +56,7 @@ function App() {
     }
     sse.onmessage = (e) => getRealtimeData(JSON.parse(e.data));
     sse.onerror = () => {
+      console.log("errrrrrrrrrrrr");
       const isRunning = running.current;
       sse.close();
       if (!isRunning) return;
@@ -83,6 +91,7 @@ function App() {
         alert("Network Error");
       });
   };
+  console.log(messages);
   return (
     <main>
       <Card className="h-screen flex flex-col">
@@ -95,14 +104,13 @@ function App() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="grow overflow-y-auto">
-          <div className="space-y-4">
+        <CardContent className="grow overflow-y-auto space-y-4" ref={scrollRef}>
             {messages.map((message) => (
               <div
                 key={message.id}
                 className={cn(
                   "flex w-max max-w-[75%] flex-col gap-2 rounded-lg px-3 py-2 text-sm",
-                  "bg-muted",
+                  "bg-muted","whitespace-pre",
                   message.mine
                     ? "ml-auto bg-primary text-primary-foreground"
                     : "bg-muted"
@@ -111,7 +119,6 @@ function App() {
                 {message.data}
               </div>
             ))}
-          </div>
         </CardContent>
         <CardFooter>
           <form
